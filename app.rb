@@ -3,6 +3,8 @@ require_relative 'database'
 require_relative 'google_books'
 require_relative 'manual_entry'
 require_relative 'automatic_entry'
+require_relative 'currently_reading'
+require_relative 'helpers'
 
 # Initialize database
 BookDatabase.init
@@ -23,7 +25,11 @@ end
 # Initially update listbox
 BookDatabase.update_listbox(book_listbox)
 
-TkButton.new(root) do
+buttons_frame = TkFrame.new(root) do
+  pack('padx' => 10, 'pady' => 10, 'fill' => 'x')
+end
+
+TkButton.new(buttons_frame) do
   text "Delete Selected"
   command do
     selected_index = book_listbox.curselection.first rescue nil
@@ -45,31 +51,70 @@ TkButton.new(root) do
       Tk.messageBox('type' => 'ok', 'icon' => 'warning', 'title' => 'Error', 'message' => 'Could not determine the book ID.')
     end
   end
-  pack('padx' => 10, 'pady' => 10)
+  pack('side' => 'left', 'padx' => 5)
 end
 
 # Button to create manual entry
-TkButton.new(root) do
+TkButton.new(buttons_frame) do
   text "Add Manual Entry"
   command do
     open_manual_entry_window(book_listbox, root)
   end
-  pack('padx' => 10, 'pady' => 10)
+  pack('side' => 'left', 'padx' => 5)
 end
 
-TkLabel.new(root) do
+TkButton.new(buttons_frame) do
+  text "View Currently Reading"
+  command do
+    open_current_books_window(root)
+  end
+  pack('side' => 'left', 'padx' => 5)
+end
+
+TkButton.new(buttons_frame) do
+  text "Add Selected Book to Currently Reading"
+  command do
+    selected_index = book_listbox.curselection.first rescue nil
+    if selected_index.nil?
+      Helpers.show_error("No Selection", "Please select a book first.")
+      next
+    end
+
+    selected_item = book_listbox.get(selected_index)
+    # Expecting the listbox item format: "ID: <id> | <isbn> | <title> | <authors>"
+    if selected_item =~ /^ID:\s*(\d+)\s*\|/
+      book_id = $1.to_i
+      start_date = Helpers.get_simple_string("Start Date", "Enter the start date (YYYY-MM-DD):")
+      progress = Helpers.get_simple_string("Progress", "Enter progress (number of pages read, leave blank for 0):")
+      progress = progress.strip.empty? ? 0 : progress.to_i
+
+      BookDatabase.add_current_book(book_id, start_date, progress)
+      Helpers.show_info("Book Added", "The book has been added to your currently reading list.")
+    else
+      Helpers.show_error("Error", "Could not determine the book ID from the selection.")
+    end
+  end
+  pack('side' => 'left', 'padx' => 5)
+end
+
+
+search_frame = TkFrame.new(root) do
+  pack('padx' => 10, 'pady' => 10, 'fill' => 'x')
+end
+
+TkLabel.new(search_frame) do
   text "Enter ISBN:"
   pack('padx' => 10, 'pady' => 10)
 end
 
 isbn_var = TkVariable.new
-TkEntry.new(root) do
+TkEntry.new(search_frame) do
   textvariable isbn_var
   width 30
   pack('padx' => 10, 'pady' => 5)
 end
 
-TkButton.new(root) do
+TkButton.new(search_frame) do
   text "Search"
   command do
     isbn = isbn_var.value

@@ -10,6 +10,7 @@ module AutomaticEntry
     return nil if book_data.nil?
     
     volume_info = book_data['volumeInfo'] || {}
+    puts volume_info.inspect
 
     # Determine a primary ISBN from Google API's Industry Identifiers.
     isbn_extracted = nil
