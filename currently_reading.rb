@@ -82,4 +82,71 @@ def open_current_books_window(root)
     pack('side' => 'left', 'padx' => 5)
   end
   
+  TkButton.new(buttons_frame) do
+    text "Mark as Completed"
+    command do
+      selected_index = current_listbox.curselection.first rescue nil
+      if selected_index.nil?
+        Helpers.show_error("No Selection", "Please select a book to mark as completed.")
+        next
+      end
+  
+      selected_item = current_listbox.get(selected_index)
+      # Expected format:
+      # "ID: <current_book_id> | Book ID: <book_id> | Title: <title> | Authors: <authors> | Start Date: <start_date> | Progress: <progress>/<page_count>"
+      if selected_item =~ /^ID:\s*(\d+)\s*\|\s*Book ID:\s*(\d+)/
+        current_book_id = $1.to_i
+        book_id = $2.to_i
+  
+        date_completed = Helpers.get_simple_string("Date Completed", "Enter the date completed (YYYY-MM-DD):")
+        review_score = Helpers.get_simple_string("Review Score", "Enter your review score (0-10):")
+        
+        # Validate review score: must be numeric and between 0 and 10.
+        if review_score.nil? || review_score.strip.empty? || review_score !~ /^\d+(\.\d+)?$/
+          Helpers.show_error("Invalid Input", "Please enter a valid number for the review score.")
+          next
+        end
+        review_score = review_score.to_f
+        if review_score < 0 || review_score > 10
+          Helpers.show_error("Invalid Input", "Review score must be between 0 and 10.")
+          next
+        end
+  
+        # Insert into completed_books and remove from current_books.
+        BookDatabase.add_completed_book(book_id, date_completed, review_score)
+        BookDatabase.mark_current_book_complete(current_book_id)
+        Helpers.show_info("Book Completed", "The selected book was marked as completed.")
+        BookDatabase.update_current_book_listbox(current_listbox)
+      else
+        Helpers.show_error("Error", "Could not determine the necessary IDs from the selection.")
+      end
+    end
+    pack('side' => 'left', 'padx' => 5)
+  end
+  
+  TkButton.new(buttons_frame) do
+    text "Drop Book From Reading List"
+    command do
+      selected_index = current_listbox.curselection.first rescue nil
+      if selected_index.nil?
+        Helpers.show_error("No Selection", "Please select a book to remove from currently reading.")
+        next
+      end
+  
+      selected_item = current_listbox.get(selected_index)
+      # Expected format: "ID: <current_book_id> | Book ID: <book_id> | Title: ... | Authors: ... | Start Date: ... | Progress: <progress>/<page_count>"
+      if selected_item =~ /^ID:\s*(\d+)\s*\|/
+        current_book_id = $1.to_i
+        if Helpers.confirm_dialog("Confirm Removal", "Are you sure you want to remove the selected book from currently reading?")
+          BookDatabase.mark_current_book_complete(current_book_id)
+          Helpers.show_info("Removed", "Book removed from currently reading.")
+          BookDatabase.update_current_book_listbox(current_listbox)
+        end
+      else
+        Helpers.show_error("Error", "Could not determine the current book ID from the selection.")
+      end
+    end
+    pack('side' => 'left', 'padx' => 5)
+  end  
+  
 end

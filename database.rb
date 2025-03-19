@@ -1,4 +1,3 @@
-# database.rb
 require 'sqlite3'
 require 'json'
 
@@ -7,7 +6,7 @@ module BookDatabase
 
   def self.init
     @db = SQLite3::Database.new(DB_FILE)
-    # Existing books table.
+    # Create the main books table if it doesn't exist.
     @db.execute <<-SQL
       CREATE TABLE IF NOT EXISTS books (
         id INTEGER PRIMARY KEY,
@@ -33,14 +32,25 @@ module BookDatabase
       );
     SQL
 
-    # New table for books currently being read.
+    # Create a table for books currently being read.
     @db.execute <<-SQL
       CREATE TABLE IF NOT EXISTS current_books (
         id INTEGER PRIMARY KEY,
         book_id INTEGER,
         start_date TEXT,
         progress INTEGER DEFAULT 0,
-        FOREIGN KEY (book_id) REFERENCES books(id)
+        FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+      );
+    SQL
+
+    # Create a table for completed books.
+    @db.execute <<-SQL
+      CREATE TABLE IF NOT EXISTS completed_books (
+        id INTEGER PRIMARY KEY,
+        book_id INTEGER,
+        date_completed TEXT,
+        review_score INTEGER,
+        FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
       );
     SQL
   end
@@ -49,7 +59,7 @@ module BookDatabase
     @db
   end
 
-  # Existing methods for books…
+  # Existing methods for the books table
   def self.insert_book(data)
     db.execute(
       "INSERT INTO books (isbn, title, authors, publisher, published_date, description, industry_identifiers, page_count, categories, average_rating, ratings_count, maturity_rating, language, preview_link, info_link, image_links, sale_info, access_info, search_info) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -98,9 +108,15 @@ module BookDatabase
     end
   end
 
-  # Add a book (by its id from the books table) to the currently reading list.
+  # Methods for the current_books table
   def self.add_current_book(book_id, start_date, progress = 0)
     db.execute("INSERT INTO current_books (book_id, start_date, progress) VALUES (?, ?, ?)", [book_id, start_date, progress])
+  end
+
+  def self.current_books
+    db.execute("SELECT cb.id, b.title, b.authors, cb.start_date, cb.progress, b.page_count
+                FROM current_books cb
+                JOIN books b ON cb.book_id = b.id")
   end
 
   def self.current_books_details
@@ -116,10 +132,49 @@ module BookDatabase
       listbox.insert('end', "No books currently being read.")
     else
       books.each do |row|
-        # row: [current_book_id, book_id, title, authors, start_date, progress, page_count]
+        # row format: [current_books.id, book_id, title, authors, start_date, progress, page_count]
         current_book_id, book_id, title, authors, start_date, progress, page_count = row
         listbox.insert('end', "ID: #{current_book_id} | Book ID: #{book_id} | Title: #{title} | Authors: #{authors} | Start Date: #{start_date} | Progress: #{progress}/#{page_count}")
       end
     end
   end
+
+  def self.add_completed_book(book_id, date_completed, review_score)
+    db.execute("INSERT INTO completed_books (book_id, date_completed, review_score) VALUES (?, ?, ?)", [book_id, date_completed, review_score])
+  end
+
+  def self.completed_books
+    db.execute("SELECT cb.id, b.title, b.authors, cb.date_completed, cb.review_score
+                FROM completed_books cb
+                JOIN books b ON cb.book_id = b.id")
+  end
+
+  def self.mark_current_book_complete(current_book_id)
+    db.execute("DELETE FROM current_books WHERE id = ?", [current_book_id])
+  end
+
+  def self.update_completed_listbox(listbox)
+    listbox.clear
+    books = completed_books
+    if books.empty?
+      listbox.insert('end', "No completed books.")
+    else
+      books.each do |row|
+        id, title, authors, date_completed, review_score = row
+        listbox.insert('end', "ID: #{id} | Title: #{title} | Authors: #{authors} | Completed: #{date_completed} | Review Score: #{review_score}/10")
+      end
+    end
+  end
+
+  def self.completed_books_stats
+    db.get_first_row(<<-SQL)
+      SELECT COUNT(*) AS total_books,
+             COALESCE(SUM(b.page_count), 0) AS total_pages,
+             COALESCE(AVG(b.page_count), 0) AS average_pages,
+             COALESCE(AVG(cb.review_score), 0) AS average_review
+      FROM completed_books cb
+      JOIN books b ON cb.book_id = b.id
+    SQL
+  end
+  
 end

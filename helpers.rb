@@ -1,7 +1,7 @@
 require 'tk'
 
 module Helpers
-  # Opens a simple dialog to get a string input from the user.
+  # Opens a simple dialog to get a string input
   def self.get_simple_string(title, prompt)
     input = nil
     dialog = TkToplevel.new do

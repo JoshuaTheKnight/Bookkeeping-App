@@ -4,14 +4,16 @@ require_relative 'google_books'
 require_relative 'manual_entry'
 require_relative 'automatic_entry'
 require_relative 'currently_reading'
+require_relative 'finished_reading'
 require_relative 'helpers'
+require_relative 'visualizations'
 
 # Initialize database
 BookDatabase.init
 
 # Create main window
 root = TkRoot.new do
-  title "Google Books ISBN Lookup"
+  title "Library"
   minsize(400, 600)
 end
 
@@ -30,7 +32,7 @@ buttons_frame = TkFrame.new(root) do
 end
 
 TkButton.new(buttons_frame) do
-  text "Delete Selected"
+  text "Remove from Library"
   command do
     selected_index = book_listbox.curselection.first rescue nil
     if selected_index.nil?
@@ -56,7 +58,7 @@ end
 
 # Button to create manual entry
 TkButton.new(buttons_frame) do
-  text "Add Manual Entry"
+  text "Manual Book Entry"
   command do
     open_manual_entry_window(book_listbox, root)
   end
@@ -95,6 +97,50 @@ TkButton.new(buttons_frame) do
     end
   end
   pack('side' => 'left', 'padx' => 5)
+end
+
+TkButton.new(buttons_frame) do
+  text "View Finished Reading"
+  command do
+    open_finished_books_window(root)
+  end
+  pack('side' => 'left', 'padx' => 5)
+end
+
+TkButton.new(buttons_frame) do
+  text "Show Stats"
+  command do
+    stats = BookDatabase.completed_books_stats
+    if stats.nil?
+      stats_message = "No completed books stats available."
+    else
+      total_books, total_pages, average_pages, average_review = stats
+      stats_message = <<~MSG
+        Total Books Completed: #{total_books.to_i}
+        Total Pages Read: #{total_pages.to_i}
+        Average Page Count: #{average_pages.round(2)}
+        Average Review Score: #{average_review.round(2)}
+      MSG
+    end
+
+    # Open a new window to display the stats
+    stats_win = TkToplevel.new(root) do
+      title "Completed Books Stats"
+      minsize(300, 200)
+    end
+
+    stats_text = TkText.new(stats_win) do
+      pack('fill' => 'both', 'expand' => true, 'padx' => 10, 'pady' => 10)
+      insert('end', stats_message)
+    end
+  end
+  pack('padx' => 10, 'pady' => 10)
+end
+
+TkButton.new(buttons_frame) do
+  text "Show Visualizations"
+  command { Visualizations.show_all_visualizations(root) }
+  pack('padx' => 10, 'pady' => 10)
 end
 
 
